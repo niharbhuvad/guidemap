@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "241979918387",
+    "project_id": "guidemap-3c40f",
+    "storage_bucket": "guidemap-3c40f.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:241979918387:android:e251e91b3e6b1e843efb46",
+        "android_client_info": {
+          "package_name": "com.example.google_map_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwDbWWGonUfvhx1vDPhVu_nJOmm7-u4uc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:241979918387:android:b804e52be214c9033efb46",
+        "android_client_info": {
+          "package_name": "com.example.guidemap"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwDbWWGonUfvhx1vDPhVu_nJOmm7-u4uc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
