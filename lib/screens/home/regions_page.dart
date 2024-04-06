@@ -96,7 +96,9 @@ class RegionsPage extends StatelessWidget {
                 flex: 1,
                 fit: FlexFit.tight,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    beamerDel.beamToNamed('/view_region/${region.id}');
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey.shade800,
                     foregroundColor: Colors.white,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:guidemap/screens/add_region/add_region_screen.dart';
 import 'package:guidemap/screens/edit_region/edit_region_screen.dart';
 import 'package:guidemap/screens/home/home_screen.dart';
+import 'package:guidemap/screens/view_region/view_region_screen.dart';
 
 final beamerDel = BeamerDelegate(
   initialPath: '/home',
@@ -27,6 +28,13 @@ final beamerDel = BeamerDelegate(
           key: const ValueKey('add_region_screen'),
           title: 'Add Region Screen',
           child: EditRegionScreen(state.pathParameters['id']!),
+        );
+      },
+      '/view_region/:id': (context, state, data) {
+        return BeamPage(
+          key: const ValueKey('add_region_screen'),
+          title: 'Add Region Screen',
+          child: ViewRegionScreen(state.pathParameters['id']!),
         );
       },
     },

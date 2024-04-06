@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:guidemap/router_config.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -83,6 +84,10 @@ class _ExplorePageState extends State<ExplorePage> {
             fillColor: Colors.green.withOpacity(0.3),
             strokeWidth: 2,
             points: coordsList,
+            consumeTapEvents: true,
+            onTap: () {
+              beamerDel.beamToNamed('/view_region/${doc.id}');
+            },
           ),
         );
       }
