@@ -118,7 +118,8 @@ class _AddRouterDialogState extends State<AddRouterDialog> {
                                 polygonId: const PolygonId('polygon_main'),
                                 fillColor: Colors.green.withOpacity(0.3),
                                 points: widget.regionModel.regionPoints,
-                                strokeWidth: 3,
+                                strokeWidth: 1,
+                                strokeColor: Colors.green.withOpacity(0.7),
                               ),
                             },
                             polylines: {

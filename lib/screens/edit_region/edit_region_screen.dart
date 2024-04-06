@@ -254,7 +254,8 @@ class _EditRegionScreenState extends State<EditRegionScreen> {
         Polygon(
           polygonId: PolygonId('polygon_${doc.id}'),
           fillColor: Colors.green.withOpacity(0.3),
-          strokeWidth: 2,
+          strokeWidth: 1,
+          strokeColor: Colors.green.withOpacity(0.7),
           points: coordsList,
         ),
       );
