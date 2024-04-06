@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:guidemap/functions.dart';
+import 'package:guidemap/router_config.dart';
 import 'package:guidemap/screens/models/place_model.dart';
 import 'package:guidemap/screens/models/region_model.dart';
 
@@ -48,13 +49,29 @@ class _AddRouterDialogState extends State<AddRouterDialog> {
     return Dialog.fullscreen(
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Add Route ${routePoints.length}'),
+          title: const Text('Add Route'),
           leading: IconButton(
             onPressed: () {
               widget.close();
             },
             icon: const Icon(Icons.arrow_back),
           ),
+          actions: [
+            IconButton(
+              onPressed: () {
+                undoFun();
+              },
+              icon: const Icon(Icons.undo),
+            ),
+            const SizedBox(width: 10),
+            IconButton(
+              onPressed: () {
+                onSubmit(context);
+              },
+              icon: const Icon(Icons.check),
+            ),
+            const SizedBox(width: 10),
+          ],
         ),
         body: Form(
           key: formKey,
@@ -224,10 +241,6 @@ class _AddRouterDialogState extends State<AddRouterDialog> {
       startPos = point;
       generateMarkers();
     }
-    if (endPos == null) {
-      endPos = point;
-      generateMarkers();
-    }
     routePoints.add({
       'note': noteCtrl.text,
       'position': point,
@@ -300,13 +313,25 @@ class _AddRouterDialogState extends State<AddRouterDialog> {
           ),
           onTap: () {
             if (startPos == null) {
-              // startPos = placeList[index].position;
-              addRoutePoint(placeList[index].position);
+              startPos = placeList[index].position;
+              routePoints.add({
+                'note': placeList[index].title,
+                'position': startPos!,
+              });
+              setState(() {
+                ptsList = getLatLngList(routePoints);
+              });
               return;
             }
             if (endPos == null) {
               endPos = placeList[index].position;
-              addRoutePoint(placeList[index].position);
+              routePoints.add({
+                'note': placeList[index].title,
+                'position': endPos!,
+              });
+              setState(() {
+                ptsList = getLatLngList(routePoints);
+              });
               return;
             }
           },
@@ -325,5 +350,54 @@ class _AddRouterDialogState extends State<AddRouterDialog> {
     setState(() {
       markers = result;
     });
+  }
+
+  void undoFun() {
+    if (endPos != null) {
+      endPos = null;
+      routePoints.removeLast();
+      generateMarkers();
+    } else if (routePoints.length > 1) {
+      routePoints.removeLast();
+    } else if (startPos != null) {
+      startPos = null;
+      routePoints.removeLast();
+      generateMarkers();
+    }
+    setState(() {
+      ptsList = getLatLngList(routePoints);
+    });
+    return;
+  }
+
+  void onSubmit(BuildContext context) async {
+    if (formKey.currentState?.validate() ?? false) {
+      if (startPos != null && endPos != null) {
+        List<Map<String, dynamic>> pointList = [];
+        for (int i = 0; i < routePoints.length; i++) {
+          LatLng pos = routePoints[i]['position'] as LatLng;
+          pointList.add({
+            'note': routePoints[i]['note'] as String,
+            'position': {
+              'latitude': pos.latitude,
+              'longitude': pos.longitude,
+            }
+          });
+        }
+        await FirebaseFirestore.instance
+            .collection('regions')
+            .doc(widget.regionModel.id)
+            .collection('routes')
+            .add({
+          'title': titleCtrl.text,
+          'routes_points': pointList,
+        });
+        // ignore: use_build_context_synchronously
+        showSnackbar(context, 'Route Added Successfully!');
+        beamerDel.beamBack();
+      } else {
+        showSnackbar(context, 'Route is not complete!');
+      }
+    }
   }
 }
