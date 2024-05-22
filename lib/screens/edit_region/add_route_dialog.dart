@@ -2,46 +2,46 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:guidemap/functions.dart';
-import 'package:guidemap/router_config.dart';
-import 'package:guidemap/screens/models/place_model.dart';
-import 'package:guidemap/screens/models/region_model.dart';
+import 'package:guidemap/models/area_model.dart';
+import 'package:guidemap/models/place_model.dart';
+import 'package:guidemap/utils/funs.dart';
+import 'package:guidemap/utils/x_colors.dart';
 
-class AddRouterDialog extends StatefulWidget {
-  final RegionModel regionModel;
+class AddRouteDialog extends StatefulWidget {
   final Function() close;
-  const AddRouterDialog({
+  final AreaModel areaModel;
+  const AddRouteDialog({
     super.key,
     required this.close,
-    required this.regionModel,
+    required this.areaModel,
   });
 
   @override
-  State<AddRouterDialog> createState() => _AddRouterDialogState();
+  State<AddRouteDialog> createState() => _AddRouteDialogState();
 }
 
-class _AddRouterDialogState extends State<AddRouterDialog> {
-  final formKey = GlobalKey<FormState>();
+class _AddRouteDialogState extends State<AddRouteDialog> {
   final titleCtrl = TextEditingController();
-  final noteCtrl = TextEditingController();
-  Completer<GoogleMapController> controller = Completer();
-  LatLng? currentPosition;
-  bool isMapLoading = true;
-  Set<Polygon> polygonSet = {};
-  List<Map<String, Object>> routePoints = [];
-  List<PlaceModel> placeList = [];
+
+  Completer<GoogleMapController> mapCtrl = Completer();
+  LatLng? middlePos;
+  // bool isLoading = true;
   List<LatLng> ptsList = [];
-  LatLng? startPos;
-  LatLng? endPos;
-  Set<Marker> markers = {};
+  List<PlaceModel> placeList = [];
+  Set<Marker> markers = <Marker>{};
 
   @override
   void initState() {
     super.initState();
-    getCurrentLocation();
-    fetchPlaces();
+    fetchPlaces(widget.areaModel.id).then((value) {
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        setState(() {
+          placeList = value;
+        });
+        generateMarkers();
+      });
+    });
   }
 
   @override
@@ -49,356 +49,176 @@ class _AddRouterDialogState extends State<AddRouterDialog> {
     return Dialog.fullscreen(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Add Route'),
+          title: Text('New Route ${placeList.length}'),
           leading: IconButton(
-            onPressed: () {
-              widget.close();
-            },
+            onPressed: () => widget.close(),
             icon: const Icon(Icons.arrow_back),
           ),
           actions: [
             IconButton(
               onPressed: () {
-                undoFun();
+                setState(() {
+                  ptsList.removeLast();
+                });
+                generateMarkers();
               },
               icon: const Icon(Icons.undo),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 5),
+            IconButton(
+              icon: const Icon(Icons.location_searching),
+              onPressed: () async {
+                fitPolygonToMap((await mapCtrl.future), widget.areaModel);
+              },
+            ),
+            const SizedBox(width: 5),
             IconButton(
               onPressed: () {
                 onSubmit(context);
               },
               icon: const Icon(Icons.check),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: MediaQuery.of(context).size.width / 70),
           ],
         ),
-        body: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextFormField(
-                    controller: titleCtrl,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Title is required!';
-                      }
-                      return null;
-                    },
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      label: Text('Route Name'),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Set Route'),
-                  const SizedBox(height: 10),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(width: 1),
-                    ),
-                    height: 450,
-                    child: isMapLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : GoogleMap(
-                            zoomGesturesEnabled: true,
-                            initialCameraPosition: CameraPosition(
-                              target: currentPosition!,
-                              zoom: 17,
-                            ),
-                            myLocationButtonEnabled: true,
-                            myLocationEnabled: true,
-                            markers: markers,
-                            polygons: {
-                              Polygon(
-                                polygonId: const PolygonId('polygon_main'),
-                                fillColor: Colors.green.withOpacity(0.3),
-                                points: widget.regionModel.regionPoints,
-                                strokeWidth: 1,
-                                strokeColor: Colors.green.withOpacity(0.7),
-                              ),
-                            },
-                            polylines: {
-                              Polyline(
-                                polylineId: const PolylineId('route_main'),
-                                width: 3,
-                                startCap: Cap.roundCap,
-                                endCap: Cap.roundCap,
-                                points: ptsList,
-                              ),
-                            },
-                          ),
-                  ),
-                  const SizedBox(height: 15),
-                  TextField(
-                    controller: noteCtrl,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      label: Text('Place Name or Route Point Note'),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  getActionBtns(context),
-                ],
+        body: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Column(
+            children: [
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Route Name',
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: Material(
+                  shape: RoundedRectangleBorder(
+                    side: const BorderSide(width: 3, color: XColors.white),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  clipBehavior: Clip.hardEdge,
+                  child: GoogleMap(
+                    onMapCreated: (controller) {
+                      mapCtrl.complete(controller);
+                      fitPolygonToMap(controller, widget.areaModel);
+                    },
+                    initialCameraPosition: CameraPosition(
+                      target: getPolygonCenter(widget.areaModel.regionPoints),
+                      zoom: 17,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    onTap: (arg) {
+                      setState(() {
+                        ptsList.add(arg);
+                      });
+                      generateMarkers();
+                    },
+                    markers: markers,
+                    polygons: {
+                      Polygon(
+                        polygonId: const PolygonId('polygon_main'),
+                        points: widget.areaModel.regionPoints,
+                        fillColor: Colors.green.withOpacity(0.3),
+                        strokeColor: Colors.green.withOpacity(0.7),
+                        strokeWidth: 1,
+                      ),
+                    },
+                    polylines: {
+                      Polyline(
+                        polylineId: const PolylineId('polyline_main'),
+                        color: Colors.black,
+                        width: 3,
+                        points: ptsList,
+                      ),
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget getActionBtns(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.max,
-      children: [
-        Flexible(
-          flex: 1,
-          fit: FlexFit.tight,
-          child: ElevatedButton(
-            onPressed: () async {
-              addAsPlace(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey.shade800,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
-            ),
-            child: const Text('Add as Place'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Flexible(
-          flex: 1,
-          fit: FlexFit.tight,
-          child: ElevatedButton(
-            onPressed: () async {
-              final currentPos = await getCurrentPosLatLng();
-              addRoutePoint(currentPos);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey.shade800,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
-            ),
-            child: const Text('Add Route Point'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<LatLng> getLatLngList(List<Map<String, Object>> list) {
-    return List.generate(list.length, (index) {
-      LatLng pos = list[index]['position'] as LatLng;
-      return LatLng(pos.latitude, pos.longitude);
-    });
-  }
-
-  Future<LatLng> getCurrentPosLatLng() async {
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    return LatLng(position.latitude, position.longitude);
-  }
-
-  Future<void> getCurrentLocation() async {
-    await Geolocator.requestPermission();
-
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    double lat = position.latitude;
-    double long = position.longitude;
-
-    LatLng location = LatLng(lat, long);
-
-    setState(() {
-      currentPosition = location;
-      isMapLoading = false;
-    });
-    return;
-  }
-
-  void addRoutePoint(LatLng point) {
-    if (startPos != null && endPos != null) {
-      showSnackbar(
-        context,
-        'Route Selected, delete a point to continue another road!',
-      );
-      return;
-    }
-    if (startPos == null) {
-      startPos = point;
-      generateMarkers();
-    }
-    routePoints.add({
-      'note': noteCtrl.text,
-      'position': point,
-    });
-    setState(() {
-      ptsList = getLatLngList(routePoints);
-    });
-  }
-
-  void addAsPlace(BuildContext context) async {
-    if (noteCtrl.text.isNotEmpty) {
-      final currentPos = await getCurrentPosLatLng();
-      await FirebaseFirestore.instance
-          .collection('regions')
-          .doc(widget.regionModel.id)
-          .collection('places')
-          .add({
-        'title': noteCtrl.text,
-        'position': {
-          'latitude': currentPos.latitude,
-          'longitude': currentPos.longitude,
-        }
-      });
-      fetchPlaces();
-    } else {
-      showSnackbar(context, 'Place Name is required!');
-    }
-  }
-
-  void fetchPlaces() async {
-    final docs = (await FirebaseFirestore.instance
-            .collection('regions')
-            .doc(widget.regionModel.id)
-            .collection('places')
-            .get())
-        .docs;
-    List<PlaceModel> result = [];
-    for (int i = 0; i < docs.length; i++) {
-      var doc = docs[i];
-      if (doc.exists) {
-        LatLng pos = LatLng(
-          doc['position']['latitude'],
-          doc['position']['longitude'],
-        );
-        result.add(
-          PlaceModel(
-            id: doc.id,
-            title: doc['title'],
-            position: pos,
-          ),
-        );
-      }
-    }
-    setState(() {
-      placeList = result;
-    });
-    generateMarkers();
-  }
-
   void generateMarkers() async {
     var result = <Marker>{};
-    for (int index = 0; index < placeList.length; index++) {
+    for (var place in placeList) {
       result.add(
         Marker(
-          markerId: MarkerId('marker_${index + 1}'),
+          markerId: MarkerId('marker_place_${place.id}'),
           icon: BitmapDescriptor.defaultMarker,
-          position: placeList[index].position,
-          infoWindow: InfoWindow(
-            title: placeList[index].title,
-          ),
+          position: place.position,
+          infoWindow: InfoWindow(title: place.title),
           onTap: () {
-            if (startPos == null) {
-              startPos = placeList[index].position;
-              routePoints.add({
-                'note': placeList[index].title,
-                'position': startPos!,
-              });
-              setState(() {
-                ptsList = getLatLngList(routePoints);
-              });
-              return;
-            }
-            if (endPos == null) {
-              endPos = placeList[index].position;
-              routePoints.add({
-                'note': placeList[index].title,
-                'position': endPos!,
-              });
-              setState(() {
-                ptsList = getLatLngList(routePoints);
-              });
-              return;
-            }
+            setState(() {
+              ptsList.add(place.position);
+            });
+            generateMarkers();
           },
         ),
       );
     }
-    if (startPos != null) {
+    if (ptsList.isNotEmpty) {
       result.add(
         Marker(
-          markerId: const MarkerId('start_point_marker'),
+          markerId: const MarkerId('marker_route_start'),
           icon: BitmapDescriptor.defaultMarker,
-          position: startPos!,
+          position: ptsList[0],
+          infoWindow: const InfoWindow(
+            title: 'Route Start',
+          ),
         ),
       );
+
+      if (ptsList.length > 1) {
+        result.add(
+          Marker(
+            markerId: const MarkerId('marker_route_end'),
+            icon: BitmapDescriptor.defaultMarker,
+            position: ptsList.last,
+            infoWindow: const InfoWindow(
+              title: 'Route End',
+            ),
+          ),
+        );
+      }
     }
     setState(() {
       markers = result;
     });
   }
 
-  void undoFun() {
-    if (endPos != null) {
-      endPos = null;
-      routePoints.removeLast();
-      generateMarkers();
-    } else if (routePoints.length > 1) {
-      routePoints.removeLast();
-    } else if (startPos != null) {
-      startPos = null;
-      routePoints.removeLast();
-      generateMarkers();
+  Future<void> onSubmit(BuildContext context) async {
+    if (ptsList.length < 2) {
+      showSnackbar(context, 'Choose 2 or more points to create route!');
+      return;
     }
-    setState(() {
-      ptsList = getLatLngList(routePoints);
+    if (titleCtrl.text.isEmpty) {
+      showSnackbar(context, 'Route Name is required!');
+      return;
+    }
+    final List<dynamic> list = List.generate(
+        ptsList.length,
+        (index) => {
+              'latitude': ptsList[index].latitude,
+              'longitude': ptsList[index].longitude,
+            });
+    await FirebaseFirestore.instance
+        .collection('regions')
+        .doc(widget.areaModel.id)
+        .collection('routes')
+        .add({
+      'title': titleCtrl.text,
+      'routes_points': list,
     });
-    return;
-  }
+    // ignore: use_build_context_synchronously
+    showSnackbar(context, 'Route Added Successfully!');
 
-  void onSubmit(BuildContext context) async {
-    if (formKey.currentState?.validate() ?? false) {
-      if (startPos != null && endPos != null) {
-        List<Map<String, dynamic>> pointList = [];
-        for (int i = 0; i < routePoints.length; i++) {
-          LatLng pos = routePoints[i]['position'] as LatLng;
-          pointList.add({
-            'note': routePoints[i]['note'] as String,
-            'position': {
-              'latitude': pos.latitude,
-              'longitude': pos.longitude,
-            }
-          });
-        }
-        await FirebaseFirestore.instance
-            .collection('regions')
-            .doc(widget.regionModel.id)
-            .collection('routes')
-            .add({
-          'title': titleCtrl.text,
-          'routes_points': pointList,
-        });
-        // ignore: use_build_context_synchronously
-        showSnackbar(context, 'Route Added Successfully!');
-        beamerDel.beamBack();
-      } else {
-        showSnackbar(context, 'Route is not complete!');
-      }
-    }
+    widget.close();
   }
 }

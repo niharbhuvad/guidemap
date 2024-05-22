@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:guidemap/utils/funs.dart';
 
 class ChooseRegionDialog extends StatefulWidget {
   final Function(List<LatLng>? pts) close;
@@ -22,7 +22,14 @@ class _ChooseRegionDialogState extends State<ChooseRegionDialog> {
   @override
   void initState() {
     super.initState();
-    getCurrentLocation();
+    getCurrentLocation().then((value) {
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        setState(() {
+          currentPosition = value;
+          isLoading = false;
+        });
+      });
+    });
   }
 
   @override
@@ -30,11 +37,9 @@ class _ChooseRegionDialogState extends State<ChooseRegionDialog> {
     return Dialog.fullscreen(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Choose Region'),
+          title: const Text('Choose Area'),
           leading: IconButton(
-            onPressed: () {
-              widget.close(null);
-            },
+            onPressed: () => widget.close(null),
             icon: const Icon(Icons.arrow_back),
           ),
           actions: [
@@ -47,7 +52,7 @@ class _ChooseRegionDialogState extends State<ChooseRegionDialog> {
               },
               icon: const Icon(Icons.undo),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 5),
             IconButton(
               onPressed: () {
                 onSubmit(context);
@@ -103,23 +108,6 @@ class _ChooseRegionDialogState extends State<ChooseRegionDialog> {
               ),
       ),
     );
-  }
-
-  void getCurrentLocation() async {
-    await Geolocator.requestPermission();
-
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    double lat = position.latitude;
-    double long = position.longitude;
-
-    LatLng location = LatLng(lat, long);
-
-    setState(() {
-      currentPosition = location;
-      isLoading = false;
-    });
   }
 
   void generateMarkers() async {
